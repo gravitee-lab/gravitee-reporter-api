@@ -1,45 +1,42 @@
-version: 2.1
+# Java Gradle CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-java/ for more details
+#
+version: 2
+jobs:
+  build:
+    docker:
+      # specify the version you desire here
+      - image: circleci/openjdk:8-jdk
 
-parameters:
-  gio_action:
-    type: enum
-    enum: [release, pr_build]
-    default: pr_build
-  dry_run:
-    type: boolean
-    default: true
-    description: "Run in dry run mode?"
-  dry_run_mvn_profile_id:
-    type: string
-    default: "gravitee-dry-run"
-    description: "Maven ID of the Maven profile to use for a dry run ?"
-  secrethub_org:
-    type: string
-    default: "your-secrethuborg"
-    description: "SecretHub Org to use to fetch secrets ?"
-  secrethub_repo:
-    type: string
-    default: "your-secrethubrepo"
-    description: "SecretHub Repo to use to fetch secrets ?"
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
 
-orbs:
-  gravitee: gravitee-io/gravitee@dev:1.0.2
+    working_directory: ~/repo
 
-workflows:
-  version: 2.1
-  pull_requests:
-    when:
-      equal: [ pr_build, << pipeline.parameters.gio_action >> ]
-    jobs:
-      - gravitee/pr-build:
-          context: cicd-orchestrator
-  release:
-    when:
-      equal: [ release, << pipeline.parameters.gio_action >> ]
-    jobs:
-      - gravitee/release:
-          context: cicd-orchestrator
-          dry_run: << pipeline.parameters.dry_run >>
-          secrethub_org: << pipeline.parameters.secrethub_org >>
-          secrethub_repo: << pipeline.parameters.secrethub_repo >>
-          dry_run_mvn_profile_id: << pipeline.parameters.dry_run_mvn_profile_id >>
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+    steps:
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "build.gradle" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run: gradle dependencies
+
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: v1-dependencies-{{ checksum "build.gradle" }}
+
+      # run tests!
+      - run: gradle test
